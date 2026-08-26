@@ -1,0 +1,26 @@
+import mongoose from 'mongoose';
+
+const kycDocumentSchema = new mongoose.Schema({
+  type: { type: String, enum: ['aadhaar', 'pan', 'driving_license', 'passport', 'other'], required: true },
+  originalName: { type: String, required: true },
+  filename: { type: String, required: true },
+  url: { type: String, required: true },
+  uploadedAt: { type: Date, default: Date.now }
+}, { _id: true });
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['customer', 'merchant', 'admin'], default: 'customer' },
+  phone: String,
+  address: String,
+  kycStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  kycDocuments: { type: [kycDocumentSchema], default: [] },
+  creditLimit: { type: Number, default: 0 },
+  autoSettlementEnabled: { type: Boolean, default: false },
+  autoSettlementMethod: { type: String, default: 'SIMULATED_UPI' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export default mongoose.model('User', userSchema);
