@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ShieldCheck, RefreshCw, LogOut } from "lucide-react";
 import api from "./api";
 
 export default function AdminDashboard() {
@@ -116,16 +117,21 @@ export default function AdminDashboard() {
     <div className="dashboard">
       <header className="topbar">
         <div>
-          <div className="brand">Smart Credit</div>
+          <div className="brand" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="logo-box" style={{ width: "24px", height: "24px", borderRadius: "6px" }}>
+              <ShieldCheck size={14} color="#fff" />
+            </div>
+            SmartCredit
+          </div>
           <h1>Admin Dashboard</h1>
           <p className="muted">System administration & KYC Verification</p>
         </div>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <button className="secondary small" onClick={load} disabled={loading}>
-            {loading ? "Refreshing..." : "Refresh"}
+            <RefreshCw size={14} style={{ marginRight: "4px" }} /> {loading ? "Refreshing..." : "Refresh"}
           </button>
           <button className="danger small" onClick={logout}>
-            Logout
+            <LogOut size={14} style={{ marginRight: "4px" }} /> Logout
           </button>
         </div>
       </header>
