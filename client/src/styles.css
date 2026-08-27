@@ -964,3 +964,114 @@ td button {
     right: -70px;
   }
 }
+
+/* ================================
+   MOBILE RESPONSIVE DESIGN
+   ================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+/* Tablets and mobile */
+@media (max-width: 768px) {
+
+  .dashboard {
+    width: 100%;
+    padding: 12px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .topbar button {
+    width: 100%;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .grid2 {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .panel {
+    width: 100%;
+    padding: 15px;
+  }
+
+  input,
+  select,
+  button {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  h1 {
+    font-size: 24px;
+  }
+
+  h2 {
+    font-size: 19px;
+  }
+
+  .card {
+    width: 100%;
+  }
+}
+
+/* Small mobile phones */
+@media (max-width: 480px) {
+
+  .dashboard {
+    padding: 8px;
+  }
+
+  .brand {
+    font-size: 20px;
+  }
+
+  h1 {
+    font-size: 21px;
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  .card strong {
+    font-size: 22px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+
+  .list-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
