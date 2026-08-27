@@ -2,8 +2,11 @@ import multer from 'multer';
 import path from 'node:path';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
-const uploadDir = path.resolve('uploads/kyc');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, '..', 'uploads', 'kyc');
 fs.mkdirSync(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
