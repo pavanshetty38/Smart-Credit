@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ShieldCheck, RefreshCw, LogOut } from "lucide-react";
 import api from "./api";
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState({ users: [], transactions: [], stats: {} });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -76,7 +78,7 @@ export default function AdminDashboard() {
 
   const logout = () => {
     localStorage.clear();
-    location.href = "/login";
+    navigate("/");
   };
 
   const getFileUrl = (doc) => {

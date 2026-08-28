@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   CreditCard,
   QrCode,
@@ -16,12 +17,18 @@ import {
   Percent,
   X,
   Camera,
-  Check
+  Check,
+  Clock,
+  Zap,
+  Sparkles,
+  CheckCheck
 } from "lucide-react";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import api from "./api";
 
 export default function CustomerDashboard() {
+  const navigate = useNavigate();
+
   const [balance, setBalance] = useState({
     creditLimit: 0,
     availableCredit: 0,
@@ -33,6 +40,12 @@ export default function CustomerDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifs, setUnreadNotifs] = useState(0);
   const [merchants, setMerchants] = useState([]);
+
+  // Auto Settlement State
+  const [autoSettlementEnabled, setAutoSettlementEnabled] = useState(false);
+  const [autoSettlementMethod, setAutoSettlementMethod] = useState("SIMULATED_AUTO_DEBIT");
+  const [settlements, setSettlements] = useState([]);
+  const [settleBusy, setSettleBusy] = useState(false);
 
   // Purchase State
   const [merchantId, setMerchantId] = useState("");
@@ -73,8 +86,15 @@ export default function CustomerDashboard() {
       }
       if (r.data.user) {
         setUser(r.data.user);
+        setAutoSettlementEnabled(Boolean(r.data.user.autoSettlementEnabled));
+        if (r.data.user.autoSettlementMethod) {
+          setAutoSettlementMethod(r.data.user.autoSettlementMethod);
+        }
       }
       setTransactions(r.data.transactions || []);
+      if (r.data.settlements) {
+        setSettlements(r.data.settlements);
+      }
     } catch (err) {
       console.error("Dashboard error:", err);
     }
@@ -256,9 +276,77 @@ export default function CustomerDashboard() {
     }
   };
 
+  // ---------------------------------------------
+  // AUTO SETTLEMENT ACTIONS
+  // ---------------------------------------------
+  const handleToggleAutoSettlement = async (enabled) => {
+    setSettleBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await api.patch("/customer/auto-settlement", {
+        enabled,
+        method: autoSettlementMethod,
+      });
+      setAutoSettlementEnabled(enabled);
+      if (res.data.user) setUser(res.data.user);
+      setMessage(
+        res.data.message ||
+          (enabled
+            ? "Auto Settlement enabled! Your dues will automatically settle every morning at 08:00 AM."
+            : "Auto Settlement disabled.")
+      );
+    } catch (err) {
+      console.error("Auto settlement toggle error:", err);
+      setError(err.response?.data?.message || "Failed to update auto settlement.");
+    } finally {
+      setSettleBusy(false);
+    }
+  };
+
+  const handleChangeAutoSettlementMethod = async (method) => {
+    setAutoSettlementMethod(method);
+    setSettleBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await api.patch("/customer/auto-settlement", {
+        enabled: autoSettlementEnabled,
+        method,
+      });
+      if (res.data.user) setUser(res.data.user);
+      setMessage(`Auto Settlement method set to ${method.replace("SIMULATED_", "")}`);
+    } catch (err) {
+      console.error("Auto settlement method error:", err);
+      setError(err.response?.data?.message || "Failed to update settlement method.");
+    } finally {
+      setSettleBusy(false);
+    }
+  };
+
+  const handleRunInstantAutoSettlement = async () => {
+    setSettleBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await api.post("/customer/auto-settlement/run");
+      if (res.data.balance) setBalance(res.data.balance);
+      if (res.data.user) setUser(res.data.user);
+      if (res.data.settlements) setSettlements(res.data.settlements);
+      if (res.data.transactions) setTransactions(res.data.transactions);
+      setMessage(res.data.message || "Auto settlement executed successfully!");
+      await load();
+    } catch (err) {
+      console.error("Instant auto settlement error:", err);
+      setError(err.response?.data?.message || "Instant auto settlement failed.");
+    } finally {
+      setSettleBusy(false);
+    }
+  };
+
   const logout = () => {
     localStorage.clear();
-    window.location.href = "/login";
+    navigate("/");
   };
 
   // Utilization calculation
@@ -738,6 +826,173 @@ export default function CustomerDashboard() {
           </form>
         </section>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 3. AUTO SETTLEMENT MANAGEMENT PANEL */}
+      {/* ========================================================================= */}
+      <section className="panel auto-settlement-panel">
+        <div className="auto-settle-header">
+          <div className="auto-settle-title-area">
+            <div className="auto-settle-icon">
+              <Zap size={22} color="#2563eb" />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <h2 style={{ margin: 0 }}>Customer Auto Settlement</h2>
+                <span className={`badge ${autoSettlementEnabled ? "badge-approved" : "badge-pending"}`}>
+                  {autoSettlementEnabled ? "AUTO ACTIVE" : "PAUSED"}
+                </span>
+              </div>
+              <p className="muted" style={{ margin: "2px 0 0", fontSize: "13px" }}>
+                Automatically clear all outstanding credit dues every morning at 08:00 AM next day
+              </p>
+            </div>
+          </div>
+
+          <div className="auto-settle-toggle-container">
+            <span style={{ fontSize: "14px", fontWeight: 600, color: autoSettlementEnabled ? "#16a34a" : "#64748b" }}>
+              {autoSettlementEnabled ? "Auto Settle ON" : "Auto Settle OFF"}
+            </span>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={autoSettlementEnabled}
+                onChange={(e) => handleToggleAutoSettlement(e.target.checked)}
+                disabled={settleBusy}
+              />
+              <span className="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div className="auto-settle-content">
+          {/* Left: Schedule Information & Benefits */}
+          <div className="schedule-info-card">
+            <div className="schedule-badge-pill">
+              <span className="schedule-pulse-dot"></span>
+              <Clock size={14} />
+              <span>Next Run: Daily Morning at 08:00 AM</span>
+            </div>
+
+            <p style={{ fontSize: "13.5px", color: "#1e293b", lineHeight: 1.5, margin: 0 }}>
+              {autoSettlementEnabled ? (
+                <>
+                  When enabled, your outstanding balance (<strong>₹{outstanding.toLocaleString("en-IN")}</strong>) will be automatically debited and settled at <strong>08:00 AM</strong> tomorrow morning via your chosen method.
+                </>
+              ) : (
+                <>
+                  Enable Auto Settlement to automatically clear your credit dues every morning at <strong>08:00 AM</strong>, avoid late payment risks, and keep your full credit limit available.
+                </>
+              )}
+            </p>
+
+            <div style={{ display: "flex", gap: "16px", fontSize: "12.5px", color: "#475569" }}>
+              <span>✓ Zero Late Fees</span>
+              <span>✓ Instant Limit Restoration</span>
+              <span>✓ Auto Notification</span>
+            </div>
+          </div>
+
+          {/* Right: Payment Method & Instant Trigger */}
+          <div className="auto-settle-actions-box">
+            <div>
+              <label style={{ fontSize: "13px", fontWeight: 600, color: "#334155" }}>
+                Settlement Payment Method
+              </label>
+              <div className="method-picker-grid">
+                <div
+                  className={`method-option-pill ${autoSettlementMethod === "SIMULATED_AUTO_DEBIT" ? "active" : ""}`}
+                  onClick={() => handleChangeAutoSettlementMethod("SIMULATED_AUTO_DEBIT")}
+                >
+                  <Zap size={14} />
+                  <span>Auto-Debit</span>
+                </div>
+                <div
+                  className={`method-option-pill ${autoSettlementMethod === "SIMULATED_UPI" ? "active" : ""}`}
+                  onClick={() => handleChangeAutoSettlementMethod("SIMULATED_UPI")}
+                >
+                  <Wallet size={14} />
+                  <span>UPI AutoPay</span>
+                </div>
+                <div
+                  className={`method-option-pill ${autoSettlementMethod === "SIMULATED_NETBANKING" ? "active" : ""}`}
+                  onClick={() => handleChangeAutoSettlementMethod("SIMULATED_NETBANKING")}
+                >
+                  <Store size={14} />
+                  <span>Net Banking</span>
+                </div>
+                <div
+                  className={`method-option-pill ${autoSettlementMethod === "SIMULATED_CARD" ? "active" : ""}`}
+                  onClick={() => handleChangeAutoSettlementMethod("SIMULATED_CARD")}
+                >
+                  <CreditCard size={14} />
+                  <span>Card Mandate</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn-instant-settle"
+              onClick={handleRunInstantAutoSettlement}
+              disabled={settleBusy || outstanding <= 0}
+              title="Test the 8:00 AM auto-settlement immediately"
+            >
+              <Sparkles size={16} />
+              {settleBusy
+                ? "Processing Settlement..."
+                : outstanding <= 0
+                ? "No Outstanding Dues"
+                : `Trigger Settlement Now (₹${outstanding.toLocaleString("en-IN")})`}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ========================================================================= */}
+      {/* SETTLEMENTS HISTORY */}
+      {/* ========================================================================= */}
+      {settlements.length > 0 && (
+        <section className="panel settlement-history-panel">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <CheckCheck size={20} color="#16a34a" />
+              <h2 style={{ margin: 0 }}>Settlement Records</h2>
+            </div>
+            <span className="muted" style={{ fontSize: "13px" }}>
+              {settlements.length} settlement(s) completed
+            </span>
+          </div>
+
+          {settlements.map((s, idx) => (
+            <div className="list-row" key={s._id || idx}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <div className="tx-type-icon tx-paid">
+                  <Check size={16} />
+                </div>
+                <div>
+                  <b>{s.type === "auto" ? "Scheduled Auto Settlement (8:00 AM)" : "Manual Settlement"}</b>
+                  <p>
+                    Method: {s.method?.replace("SIMULATED_", "") || "Auto-Debit"} • Ref: {s.reference || "N/A"}
+                  </p>
+                  <small>{s.createdAt ? new Date(s.createdAt).toLocaleString() : ""}</small>
+                </div>
+              </div>
+
+              <div style={{ textAlign: "right" }}>
+                <strong style={{ fontSize: "16px", color: "#16a34a" }}>
+                  ₹{Number(s.amount || 0).toLocaleString("en-IN")}
+                </strong>
+                <p style={{ marginTop: "4px" }}>
+                  <span className="badge badge-approved">
+                    {(s.status || "COMPLETED").toUpperCase()}
+                  </span>
+                </p>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* ========================================================================= */}
       {/* RECENT TRANSACTIONS */}

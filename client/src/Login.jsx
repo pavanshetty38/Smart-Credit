@@ -1,6 +1,5 @@
-import React from "react";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import api from "./api";
 
 export default function Login() {
@@ -41,7 +40,7 @@ export default function Login() {
         <label>Password</label>
         <input type="password" value={form.password} required onChange={e => setForm({...form, password:e.target.value})} />
         <button className="primary" disabled={busy}>{busy ? "Signing in..." : "Login"}</button>
-        <p className="auth-link">Don't have an account? <a href="/register">Register</a></p>
+        <p className="auth-link">Don't have an account? <Link to="/register">Register</Link></p>
       </form>
     </div>
   );

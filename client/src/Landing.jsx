@@ -30,7 +30,7 @@ export default function Landing() {
   const handleLogout = () => {
     localStorage.clear();
     setUser(null);
-    navigate("/login");
+    navigate("/");
   };
 
   const getDashboardPath = () => {

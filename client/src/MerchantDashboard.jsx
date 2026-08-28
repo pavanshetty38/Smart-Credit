@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Store,
   QrCode,
@@ -21,6 +22,7 @@ import { QRCodeSVG } from "qrcode.react";
 import api from "./api";
 
 export default function MerchantDashboard() {
+  const navigate = useNavigate();
   const [data, setData] = useState({
     user: null,
     sales: [],
@@ -157,7 +159,7 @@ export default function MerchantDashboard() {
 
   const logout = () => {
     localStorage.clear();
-    window.location.href = "/login";
+    navigate("/");
   };
 
   const merchantUser = data.user || JSON.parse(localStorage.getItem("user") || "{}");

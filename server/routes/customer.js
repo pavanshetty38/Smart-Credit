@@ -6,6 +6,7 @@ import Transaction from '../models/Transaction.js';
 import Repayment from '../models/Repayment.js';
 import Settlement from '../models/Settlement.js';
 import { ref, notifyUser } from '../utils.js';
+import { runAutoSettlementForCustomer } from '../jobs/autoSettlement.js';
 
 const router = Router();
 
@@ -222,14 +223,12 @@ router.post(
 );
 
 // --------------------------------------------------
-// AUTO SETTLEMENT
+// AUTO SETTLEMENT CONFIGURATION
 // --------------------------------------------------
 router.patch('/auto-settlement', async (req, res) => {
   try {
     const enabled = Boolean(req.body.enabled);
-
-    const method =
-      req.body.method || 'SIMULATED_UPI';
+    const method = req.body.method || 'SIMULATED_AUTO_DEBIT';
 
     const user = await User.findByIdAndUpdate(
       req.user._id,
@@ -245,14 +244,43 @@ router.patch('/auto-settlement', async (req, res) => {
     res.json({
       user,
       message: enabled
-        ? 'Auto Settlement enabled. It runs daily at the configured server time.'
+        ? 'Auto Settlement enabled. Your dues will be automatically settled every morning at 08:00 AM.'
         : 'Auto Settlement disabled.'
     });
   } catch (error) {
     console.error('Auto settlement error:', error);
-
     res.status(500).json({
-      message: error.message || 'Unable to update auto settlement'
+      message: error.message || 'Unable to update auto settlement settings'
+    });
+  }
+});
+
+// --------------------------------------------------
+// TRIGGER INSTANT AUTO SETTLEMENT (MANUAL / TEST RUN)
+// --------------------------------------------------
+router.post('/auto-settlement/run', async (req, res) => {
+  try {
+    const result = await runAutoSettlementForCustomer(req.user._id, true);
+    const balance = await getBalance(req.user._id);
+    const user = await User.findById(req.user._id).select('-password');
+    const settlements = await Settlement.find({ customer: req.user._id }).sort('-createdAt').limit(20);
+    const transactions = await Transaction.find({ customer: req.user._id }).populate('merchant', 'name email').sort('-createdAt').limit(30);
+
+    res.json({
+      success: true,
+      message: result.settled
+        ? `Auto Settlement executed successfully for ₹${result.settledAmount.toLocaleString('en-IN')}.`
+        : (result.message || 'No outstanding dues to auto settle.'),
+      result,
+      balance,
+      user,
+      settlements,
+      transactions
+    });
+  } catch (error) {
+    console.error('Auto settlement run error:', error);
+    res.status(500).json({
+      message: error.message || 'Failed to execute auto settlement'
     });
   }
 });

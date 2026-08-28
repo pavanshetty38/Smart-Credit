@@ -1,6 +1,5 @@
-import React from "react";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import api from "./api";
 
 export default function Register() {
@@ -55,7 +54,7 @@ export default function Register() {
         <label>KYC document (optional)</label>
         <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e=>setKycFile(e.target.files?.[0] || null)}/>
         <button className="primary" disabled={busy}>{busy ? "Creating..." : "Register"}</button>
-        <p className="auth-link">Already registered? <a href="/login">Login</a></p>
+        <p className="auth-link">Already registered? <Link to="/login">Login</Link></p>
       </form>
     </div>
   );
