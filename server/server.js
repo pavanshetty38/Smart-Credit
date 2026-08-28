@@ -97,31 +97,28 @@ app.use("/api/notifications", notificationsRoutes);
 const clientDistPath = path.join(__dirname, "../client/dist");
 if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
-      return next();
-    }
-    res.sendFile(path.join(clientDistPath, "index.html"), (err) => {
-      if (err) next();
-    });
-  });
 }
 
-
-// ===============================
-// 404 HANDLER
-// ===============================
-
-app.use("/api/*", (_req, res) => {
+// 404 handler for API routes
+app.use("/api", (_req, res) => {
   res.status(404).json({
     message: "API route not found",
   });
 });
 
-app.use((_req, res) => {
-  if (fs.existsSync(path.join(clientDistPath, "index.html"))) {
-    return res.sendFile(path.join(clientDistPath, "index.html"));
+// Wildcard SPA Fallback for client routes
+app.use((req, res, next) => {
+  if (req.method === "GET" && !req.path.startsWith("/api") && !req.path.startsWith("/uploads")) {
+    const indexPath = path.join(clientDistPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    }
   }
+  next();
+});
+
+// Final 404 Handler
+app.use((_req, res) => {
   res.status(404).json({
     message: "Route not found",
   });
