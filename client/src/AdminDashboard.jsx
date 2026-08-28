@@ -15,6 +15,7 @@ export default function AdminDashboard() {
   const [limitModalUser, setLimitModalUser] = useState(null);
   const [newCreditLimit, setNewCreditLimit] = useState("");
   const [activeDocIndex, setActiveDocIndex] = useState(0);
+  const [imgError, setImgError] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -74,6 +75,7 @@ export default function AdminDashboard() {
   const openDocViewer = async (user) => {
     setSelectedUser(user);
     setActiveDocIndex(0);
+    setImgError(false);
     try {
       const res = await api.get(`/admin/user/${user._id}/kyc-documents`);
       if (res.data && Array.isArray(res.data.kycDocuments)) {
@@ -486,34 +488,48 @@ export default function AdminDashboard() {
                             </div>
                           ) : (
                             <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                              <img
-                                src={fullUrl}
-                                alt={doc.originalName || "KYC Document"}
-                                className="doc-preview-img"
-                                style={{ maxHeight: "400px", maxWidth: "100%", objectFit: "contain", borderRadius: "8px" }}
-                                onError={(e) => {
-                                  e.currentTarget.style.display = "none";
-                                  const fallbackEl = e.currentTarget.parentElement?.querySelector(".doc-fallback-dynamic");
-                                  if (fallbackEl) fallbackEl.style.display = "block";
-                                }}
-                              />
-                              <div className="doc-fallback-dynamic doc-fallback" style={{ display: "none", width: "100%", textAlign: "center", padding: "20px" }}>
-                                <p style={{ color: "#2563eb", fontWeight: 600, marginBottom: "8px" }}>
-                                  📄 KYC Document File Ready
-                                </p>
-                                <p className="muted" style={{ fontSize: "13px", marginBottom: "14px" }}>
-                                  Document: <strong>{doc.originalName || doc.filename || "Uploaded file"}</strong>
-                                </p>
-                                <a
-                                  href={fullUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="primary small"
-                                  style={{ textDecoration: "none" }}
-                                >
-                                  ↗ Open / Download Document
-                                </a>
-                              </div>
+                              {!imgError && fullUrl ? (
+                                <img
+                                  key={`${selectedUser?._id}-${activeDocIndex}-${(fullUrl || "").slice(-15)}`}
+                                  src={fullUrl}
+                                  alt={doc.originalName || "KYC Document"}
+                                  className="doc-preview-img"
+                                  style={{
+                                    maxHeight: "420px",
+                                    maxWidth: "100%",
+                                    objectFit: "contain",
+                                    borderRadius: "8px",
+                                    border: "1px solid #e2e8f0",
+                                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                                    background: "#ffffff"
+                                  }}
+                                  onError={() => setImgError(true)}
+                                />
+                              ) : (
+                                <div className="doc-fallback" style={{ width: "100%", textAlign: "center", padding: "28px 20px", background: "#f8fafc", borderRadius: "10px", border: "1px dashed #cbd5e1" }}>
+                                  <div style={{ fontSize: "44px", marginBottom: "10px" }}>📄</div>
+                                  <p style={{ color: "#1e293b", fontWeight: 700, fontSize: "16px", margin: "0 0 6px" }}>
+                                    {doc.type ? doc.type.toUpperCase() : "KYC DOCUMENT"}
+                                  </p>
+                                  <p className="muted" style={{ fontSize: "13px", margin: "0 0 6px" }}>
+                                    Original File: <strong>{doc.originalName || doc.filename || "Uploaded record"}</strong>
+                                  </p>
+                                  <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 16px" }}>
+                                    Uploaded: {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString() : "Recently"}
+                                  </p>
+                                  {fullUrl && (
+                                    <a
+                                      href={fullUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="primary small"
+                                      style={{ textDecoration: "none", display: "inline-block" }}
+                                    >
+                                      ↗ Open / Download Document
+                                    </a>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
