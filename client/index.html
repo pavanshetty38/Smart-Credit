@@ -10,6 +10,14 @@
     />
 
     <title>Smart Credit</title>
+    <script>
+      (function() {
+        var p = window.location.pathname;
+        if (p && p !== '/' && p !== '/index.html' && !window.location.hash) {
+          window.location.replace('/#' + p + window.location.search);
+        }
+      })();
+    </script>
   </head>
 
   <body>
