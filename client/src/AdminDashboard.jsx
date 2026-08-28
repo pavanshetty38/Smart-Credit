@@ -71,9 +71,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const openDocViewer = (user) => {
+  const openDocViewer = async (user) => {
     setSelectedUser(user);
     setActiveDocIndex(0);
+    try {
+      const res = await api.get(`/admin/user/${user._id}/kyc-documents`);
+      if (res.data && Array.isArray(res.data.kycDocuments)) {
+        setSelectedUser((prev) => (prev?._id === user._id ? { ...prev, ...res.data } : prev));
+      }
+    } catch (e) {
+      console.log("Using cached user KYC documents:", e?.message);
+    }
   };
 
   const logout = () => {
@@ -90,8 +98,14 @@ export default function AdminDashboard() {
       rawUrl = doc.url || (doc.filename ? `/uploads/kyc/${doc.filename}` : "");
     }
     if (!rawUrl) return "";
-    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) return rawUrl;
-    const backendBase = (import.meta.env.VITE_API_URL || "http://localhost:5000/api").replace(/\/api\/?$/, "");
+    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) {
+      return rawUrl;
+    }
+    let apiBase = (import.meta.env.VITE_API_URL || api.defaults?.baseURL || "").trim();
+    if (!apiBase || apiBase.startsWith("/")) {
+      apiBase = window.location.origin;
+    }
+    const backendBase = apiBase.replace(/\/api\/?$/, "");
     return `${backendBase}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
   };
 
@@ -454,38 +468,53 @@ export default function AdminDashboard() {
                         {/* Inline Preview Container */}
                         <div className="doc-preview-area">
                           {isPdf ? (
-                            <iframe
-                              src={fullUrl}
-                              title="PDF Preview"
-                              className="doc-preview-iframe"
-                            />
+                            <div style={{ width: "100%", height: "100%", minHeight: "360px", display: "flex", flexDirection: "column" }}>
+                              <iframe
+                                src={fullUrl}
+                                title="PDF Preview"
+                                className="doc-preview-iframe"
+                                style={{ width: "100%", height: "400px", border: "1px solid #e2e8f0", borderRadius: "8px" }}
+                              />
+                              <div style={{ marginTop: "10px", textAlign: "center" }}>
+                                <a
+                                  href={fullUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="secondary small"
+                                  style={{ textDecoration: "none" }}
+                                >
+                                  📄 Open Full PDF in New Tab
+                                </a>
+                              </div>
+                            </div>
                           ) : (
                             <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
                               <img
                                 src={fullUrl}
                                 alt={doc.originalName || "KYC Document"}
                                 className="doc-preview-img"
-                                crossOrigin="anonymous"
+                                style={{ maxHeight: "400px", maxWidth: "100%", objectFit: "contain", borderRadius: "8px" }}
                                 onError={(e) => {
                                   e.currentTarget.style.display = "none";
-                                  const fallbackEl = document.getElementById("img-err-fallback");
+                                  const fallbackEl = e.currentTarget.parentElement?.querySelector(".doc-fallback-dynamic");
                                   if (fallbackEl) fallbackEl.style.display = "block";
                                 }}
                               />
-                              <div id="img-err-fallback" className="doc-fallback" style={{ display: "none", width: "100%" }}>
-                                <p style={{ color: "#ef4444", fontWeight: 600, marginBottom: "8px" }}>
-                                  Document image preview could not be rendered directly.
+                              <div className="doc-fallback-dynamic doc-fallback" style={{ display: "none", width: "100%", textAlign: "center", padding: "20px" }}>
+                                <p style={{ color: "#2563eb", fontWeight: 600, marginBottom: "8px" }}>
+                                  📄 KYC Document File Ready
                                 </p>
-                                <p className="muted" style={{ fontSize: "12px", marginBottom: "12px" }}>
-                                  File: {doc.originalName || doc.filename}
+                                <p className="muted" style={{ fontSize: "13px", marginBottom: "14px" }}>
+                                  Document: <strong>{doc.originalName || doc.filename || "Uploaded file"}</strong>
                                 </p>
                                 <a
                                   href={fullUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="primary small"
+                                  style={{ textDecoration: "none" }}
                                 >
-                                  Open / Download Image in New Tab
+                                  ↗ Open / Download Document
                                 </a>
                               </div>
                             </div>

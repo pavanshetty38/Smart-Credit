@@ -47,6 +47,12 @@ export default function MerchantDashboard() {
   const [error, setError] = useState("");
   const [copiedQr, setCopiedQr] = useState(false);
 
+  // Merchant KYC Modal State
+  const [showKycModal, setShowKycModal] = useState(false);
+  const [kycFile, setKycFile] = useState(null);
+  const [kycDocType, setKycDocType] = useState("business_proof");
+  const [kycBusy, setKycBusy] = useState(false);
+
   const notifRef = useRef(null);
 
   // Close notifications on outside click
@@ -157,6 +163,56 @@ export default function MerchantDashboard() {
     }
   };
 
+  const getFileUrl = (doc) => {
+    if (!doc) return "";
+    let rawUrl = "";
+    if (typeof doc === "string") {
+      rawUrl = doc;
+    } else {
+      rawUrl = doc.url || (doc.filename ? `/uploads/kyc/${doc.filename}` : "");
+    }
+    if (!rawUrl) return "";
+    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) {
+      return rawUrl;
+    }
+    let apiBase = (import.meta.env.VITE_API_URL || api.defaults?.baseURL || "").trim();
+    if (!apiBase || apiBase.startsWith("/")) {
+      apiBase = window.location.origin;
+    }
+    const backendBase = apiBase.replace(/\/api\/?$/, "");
+    return `${backendBase}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+  };
+
+  const uploadKycDoc = async (e) => {
+    e.preventDefault();
+    if (!kycFile) {
+      setError("Please select a merchant KYC document file to upload.");
+      return;
+    }
+    setKycBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const fd = new FormData();
+      fd.append("documents", kycFile);
+      fd.append("types", kycDocType);
+      const res = await api.post("/merchant/kyc-documents", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (res.data.user) {
+        setData((prev) => ({ ...prev, user: res.data.user }));
+      }
+      setMessage(res.data.message || "Merchant KYC documents uploaded. Awaiting admin approval.");
+      setKycFile(null);
+      await load();
+    } catch (err) {
+      console.error("Merchant KYC upload error:", err);
+      setError(err.response?.data?.message || "Failed to upload merchant KYC document.");
+    } finally {
+      setKycBusy(false);
+    }
+  };
+
   const logout = () => {
     localStorage.clear();
     navigate("/");
@@ -232,6 +288,14 @@ export default function MerchantDashboard() {
             <span className={`badge badge-${merchantUser.kycStatus || "pending"}`}>
               {(merchantUser.kycStatus || "pending").toUpperCase()}
             </span>
+            <button
+              type="button"
+              className="secondary small"
+              style={{ marginLeft: "10px", padding: "3px 8px", fontSize: "11px" }}
+              onClick={() => setShowKycModal(true)}
+            >
+              📄 KYC Documents ({merchantUser?.kycDocuments?.length || 0})
+            </button>
           </p>
         </div>
 
@@ -577,6 +641,139 @@ export default function MerchantDashboard() {
           <p className="muted">No sales recorded yet. Provide your QR code to customers to begin accepting payments.</p>
         )}
       </section>
+
+      {/* ========================================================================= */}
+      {/* MERCHANT KYC DOCUMENTS MODAL */}
+      {/* ========================================================================= */}
+      {showKycModal && (
+        <div className="modal-overlay" onClick={() => setShowKycModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "600px" }}>
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div className="logo-box" style={{ width: "28px", height: "28px", borderRadius: "6px" }}>
+                  <ShieldCheck size={16} color="#fff" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0 }}>Merchant KYC Documents</h3>
+                  <p className="muted" style={{ margin: 0, fontSize: "12px" }}>
+                    View uploaded documents or submit business verification files
+                  </p>
+                </div>
+              </div>
+              <button className="close-btn" onClick={() => setShowKycModal(false)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* Existing Uploaded Documents */}
+              <div style={{ marginBottom: "20px" }}>
+                <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#1e293b", marginBottom: "10px" }}>
+                  Uploaded Merchant Documents ({merchantUser?.kycDocuments?.length || 0})
+                </h4>
+
+                {merchantUser?.kycDocuments && merchantUser.kycDocuments.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {merchantUser.kycDocuments.map((doc, idx) => {
+                      const url = getFileUrl(doc);
+                      return (
+                        <div
+                          key={doc._id || idx}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "10px 14px",
+                            background: "#f8fafc",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <div>
+                            <span style={{ fontWeight: 600, textTransform: "uppercase", fontSize: "12px", color: "#a21caf" }}>
+                              {doc.type || "Document"}
+                            </span>
+                            <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#334155" }}>
+                              {doc.originalName || doc.filename || "Uploaded File"}
+                            </p>
+                            <small className="muted">
+                              {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString() : "Uploaded"}
+                            </small>
+                          </div>
+
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="primary small"
+                            style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}
+                          >
+                            ↗ Open Document
+                          </a>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ padding: "16px", background: "#f8fafc", borderRadius: "8px", textAlign: "center" }}>
+                    <p className="muted" style={{ margin: 0, fontSize: "13px" }}>
+                      No merchant KYC documents uploaded yet. Upload below to get verified.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload New Document Form */}
+              <form onSubmit={uploadKycDoc} style={{ borderTop: "1px solid #e2e8f0", paddingTop: "16px" }}>
+                <h4 style={{ fontSize: "14px", fontWeight: 600, color: "#1e293b", marginBottom: "10px" }}>
+                  Upload Business Verification Document
+                </h4>
+
+                <div className="form-group" style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "13px", fontWeight: 600 }}>Document Type</label>
+                  <select
+                    value={kycDocType}
+                    onChange={(e) => setKycDocType(e.target.value)}
+                    className="styled-select"
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: "6px" }}
+                  >
+                    <option value="business_proof">Business Proof / GST Registration</option>
+                    <option value="pan">Merchant PAN Card</option>
+                    <option value="aadhaar">Owner Aadhaar Card</option>
+                    <option value="passport">Passport</option>
+                    <option value="other">Other Commercial License</option>
+                  </select>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "13px", fontWeight: 600 }}>Select File (PDF, PNG, JPG)</label>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => setKycFile(e.target.files?.[0] || null)}
+                    style={{ width: "100%", padding: "8px", border: "1px solid #cbd5e1", borderRadius: "6px" }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="primary"
+                  disabled={kycBusy || !kycFile}
+                  style={{ width: "100%", padding: "10px" }}
+                >
+                  {kycBusy ? "Uploading KYC..." : "Upload Document"}
+                </button>
+              </form>
+            </div>
+
+            <div className="modal-footer">
+              <button className="secondary" onClick={() => setShowKycModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

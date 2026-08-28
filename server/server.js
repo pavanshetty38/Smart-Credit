@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import dns from "node:dns";
+import fs from "node:fs";
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
@@ -90,12 +91,39 @@ app.use("/api/notifications", notificationsRoutes);
 
 
 // ===============================
+// SERVE STATIC CLIENT IN PRODUCTION
+// ===============================
+
+const clientDistPath = path.join(__dirname, "../client/dist");
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistPath, "index.html"), (err) => {
+      if (err) next();
+    });
+  });
+}
+
+
+// ===============================
 // 404 HANDLER
 // ===============================
 
-app.use((_req, res) => {
+app.use("/api/*", (_req, res) => {
   res.status(404).json({
     message: "API route not found",
+  });
+});
+
+app.use((_req, res) => {
+  if (fs.existsSync(path.join(clientDistPath, "index.html"))) {
+    return res.sendFile(path.join(clientDistPath, "index.html"));
+  }
+  res.status(404).json({
+    message: "Route not found",
   });
 });
 
