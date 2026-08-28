@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { auth, roles } from '../middleware/auth.js';
-import { kycUpload } from '../middleware/upload.js';
+import { kycUpload, processUploadedFile } from '../middleware/upload.js';
 import User from '../models/User.js';
 import Transaction from '../models/Transaction.js';
 import Repayment from '../models/Repayment.js';
@@ -165,12 +165,9 @@ router.post(
           ? [req.body.types]
           : [];
 
-      const docs = req.files.map((file, index) => ({
-        type: types[index] || 'other',
-        originalName: file.originalname,
-        filename: file.filename,
-        url: `/uploads/kyc/${file.filename}`
-      }));
+      const docs = req.files
+        .map((file, index) => processUploadedFile(file, types[index] || 'other'))
+        .filter(Boolean);
 
       const user = await User.findByIdAndUpdate(
         req.user._id,

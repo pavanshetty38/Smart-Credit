@@ -3,7 +3,7 @@ services:
     name: smart-credit-api
     env: node
     rootDir: server
-    buildCommand: npm install
+    buildCommand: npm install && cd ../client && npm install && npm run build
     startCommand: npm start
     envVars:
       - key: MONGO_URI

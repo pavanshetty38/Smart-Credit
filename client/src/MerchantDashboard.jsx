@@ -165,18 +165,15 @@ export default function MerchantDashboard() {
 
   const getFileUrl = (doc) => {
     if (!doc) return "";
-    let rawUrl = "";
-    if (typeof doc === "string") {
-      rawUrl = doc;
-    } else {
-      rawUrl = doc.url || (doc.filename ? `/uploads/kyc/${doc.filename}` : "");
+    if (typeof doc === "string") return doc;
+    if (doc.dataUrl) return doc.dataUrl;
+    if (doc.url && (doc.url.startsWith("data:") || doc.url.startsWith("http://") || doc.url.startsWith("https://") || doc.url.startsWith("blob:"))) {
+      return doc.url;
     }
+    let rawUrl = doc.url || (doc.filename ? `/uploads/kyc/${doc.filename}` : "");
     if (!rawUrl) return "";
-    if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://") || rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) {
-      return rawUrl;
-    }
     let apiBase = (import.meta.env.VITE_API_URL || api.defaults?.baseURL || "").trim();
-    if (!apiBase || apiBase.startsWith("/")) {
+    if (!apiBase || apiBase.startsWith("/") || (apiBase.includes("localhost") && window.location.hostname !== "localhost")) {
       apiBase = window.location.origin;
     }
     const backendBase = apiBase.replace(/\/api\/?$/, "");

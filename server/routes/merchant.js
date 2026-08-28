@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { auth, roles } from '../middleware/auth.js';
-import { kycUpload } from '../middleware/upload.js';
+import { kycUpload, processUploadedFile } from '../middleware/upload.js';
 import User from '../models/User.js';
 import Transaction from '../models/Transaction.js';
 import Repayment from '../models/Repayment.js';
@@ -22,7 +22,9 @@ router.get('/dashboard', async (req, res) => {
 router.post('/kyc-documents', kycUpload.array('documents', 5), async (req, res) => {
   if (!req.files?.length) return res.status(400).json({ message: 'Please select at least one KYC document' });
   const types = Array.isArray(req.body.types) ? req.body.types : (req.body.types ? [req.body.types] : []);
-  const docs = req.files.map((file, index) => ({ type: types[index] || 'other', originalName: file.originalname, filename: file.filename, url: `/uploads/kyc/${file.filename}` }));
+  const docs = req.files
+    .map((file, index) => processUploadedFile(file, types[index] || 'business_proof'))
+    .filter(Boolean);
   const user = await User.findByIdAndUpdate(req.user._id, { $push: { kycDocuments: { $each: docs } }, $set: { kycStatus: 'pending' } }, { new: true }).select('-password');
 
   const admins = await User.find({ role: 'admin' }).select('_id');

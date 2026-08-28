@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 
 const kycDocumentSchema = new mongoose.Schema({
-  type: { type: String, enum: ['aadhaar', 'pan', 'driving_license', 'passport', 'other'], required: true },
+  type: { type: String, default: 'other' },
   originalName: { type: String, required: true },
-  filename: { type: String, required: true },
-  url: { type: String, required: true },
+  filename: { type: String, default: '' },
+  mimetype: { type: String, default: 'image/jpeg' },
+  url: { type: String, default: '' },
+  dataUrl: { type: String, default: '' },
   uploadedAt: { type: Date, default: Date.now }
 }, { _id: true });
 
