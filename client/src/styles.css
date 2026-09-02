@@ -159,6 +159,19 @@ button {
   background: #eff6ff;
 }
 
+.btn-delete {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
+  color: #b91c1c !important;
+}
+
+
 /* =====================================================
    BADGES
    ===================================================== */

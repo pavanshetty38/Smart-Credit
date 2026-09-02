@@ -1,10 +1,17 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import { auth, roles } from '../middleware/auth.js';
 import User from '../models/User.js';
 import Transaction from '../models/Transaction.js';
 import Repayment from '../models/Repayment.js';
 import Settlement from '../models/Settlement.js';
+import Notification from '../models/Notification.js';
 import { notifyUser } from '../utils.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 router.use(auth, roles('admin'));
@@ -100,6 +107,58 @@ router.get('/user/:id/kyc-documents', async (req, res) => {
   const u = await User.findById(req.params.id).select('name email role kycStatus kycDocuments');
   if (!u) return res.status(404).json({ message: 'User not found' });
   res.json(u);
+});
+
+router.delete('/user/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(400).json({ message: 'Admin accounts cannot be deleted' });
+    }
+
+    // Clean up KYC files from disk if any exist
+    if (Array.isArray(user.kycDocuments)) {
+      for (const doc of user.kycDocuments) {
+        if (doc.filename) {
+          try {
+            const filePath = path.join(__dirname, '..', 'uploads', 'kyc', doc.filename);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
+          } catch (fileErr) {
+            console.error('Error removing KYC file from disk:', fileErr.message);
+          }
+        }
+      }
+    }
+
+    const roleName = user.role === 'merchant' ? 'Merchant' : 'Customer';
+    const userName = user.name;
+
+    // Cascade delete related records across all collections
+    await Promise.all([
+      Notification.deleteMany({ user: user._id }),
+      Transaction.deleteMany({ $or: [{ customer: user._id }, { merchant: user._id }] }),
+      Repayment.deleteMany({ customer: user._id }),
+      Settlement.deleteMany({ customer: user._id }),
+      User.findByIdAndDelete(user._id)
+    ]);
+
+    res.json({
+      success: true,
+      message: `${roleName} "${userName}" and all associated records deleted successfully.`
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      message: error.message || 'Unable to delete user'
+    });
+  }
 });
 
 export default router;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ShieldCheck, RefreshCw, LogOut } from "lucide-react";
+import { ShieldCheck, RefreshCw, LogOut, Trash2, AlertTriangle, UserX } from "lucide-react";
 import api from "./api";
 
 export default function AdminDashboard() {
@@ -16,6 +16,8 @@ export default function AdminDashboard() {
   const [newCreditLimit, setNewCreditLimit] = useState("");
   const [activeDocIndex, setActiveDocIndex] = useState(0);
   const [imgError, setImgError] = useState(false);
+  const [deleteModalUser, setDeleteModalUser] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -72,6 +74,30 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteModalUser) return;
+    setDeleting(true);
+    setError("");
+    setSuccess("");
+    try {
+      const res = await api.delete(`/admin/user/${deleteModalUser._id}`);
+      setSuccess(res.data?.message || `${deleteModalUser.role === "merchant" ? "Merchant" : "Customer"} deleted successfully.`);
+      if (selectedUser && selectedUser._id === deleteModalUser._id) {
+        setSelectedUser(null);
+      }
+      if (limitModalUser && limitModalUser._id === deleteModalUser._id) {
+        setLimitModalUser(null);
+      }
+      setDeleteModalUser(null);
+      await load();
+    } catch (e) {
+      console.error("Delete user error:", e);
+      setError(e.response?.data?.message || "Unable to delete user");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const openDocViewer = async (user) => {
     setSelectedUser(user);
     setActiveDocIndex(0);
@@ -111,6 +137,8 @@ export default function AdminDashboard() {
   const s = data.stats || {};
   const users = data.users || [];
 
+  const [userRoleFilter, setUserRoleFilter] = useState("all"); // 'all', 'customer', 'merchant'
+
   // Filter pending KYC users (both merchants and customers)
   const pendingKycUsers = users.filter((u) => {
     const isPending = u.kycStatus === "pending";
@@ -119,13 +147,15 @@ export default function AdminDashboard() {
     return isPending;
   });
 
-  // Filter registered users by search and role
+  // Filter registered users by search and role filter
   const filteredUsers = users.filter((u) => {
+    const matchesRole = userRoleFilter === "all" || u.role === userRoleFilter;
     const matchesSearch =
+      !searchQuery ||
       (u.name && u.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (u.email && u.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (u.phone && u.phone.includes(searchQuery));
-    return matchesSearch;
+    return matchesRole && matchesSearch;
   });
 
   return (
@@ -164,13 +194,31 @@ export default function AdminDashboard() {
 
       {/* Stats Cards */}
       <div className="cards">
-        <Card title="Customers" value={s.customers || 0} sub="Registered customers" />
-        <Card title="Merchants" value={s.merchants || 0} sub="Registered merchants" />
-        <Card
-          title="Pending KYC"
-          value={s.pendingKyc || users.filter((u) => u.kycStatus === "pending").length}
-          sub="Merchants & Customers awaiting review"
-        />
+        <div
+          onClick={() => setUserRoleFilter("customer")}
+          style={{ cursor: "pointer" }}
+          title="Click to view all customers"
+        >
+          <Card title="Customers" value={s.customers || 0} sub="Registered customers (click to view)" />
+        </div>
+        <div
+          onClick={() => setUserRoleFilter("merchant")}
+          style={{ cursor: "pointer" }}
+          title="Click to view all merchants"
+        >
+          <Card title="Merchants" value={s.merchants || 0} sub="Registered merchants (click to view)" />
+        </div>
+        <div
+          onClick={() => setFilterRole("all")}
+          style={{ cursor: "pointer" }}
+          title="Click to view pending KYC"
+        >
+          <Card
+            title="Pending KYC"
+            value={s.pendingKyc || users.filter((u) => u.kycStatus === "pending").length}
+            sub="Merchants & Customers awaiting review"
+          />
+        </div>
         <Card
           title="Total Sales"
           value={`₹${Number(s.totalSales || 0).toLocaleString()}`}
@@ -249,6 +297,15 @@ export default function AdminDashboard() {
                   >
                     ✕ Reject
                   </button>
+                  {u.role !== "admin" && (
+                    <button
+                      className="danger small btn-delete"
+                      onClick={() => setDeleteModalUser(u)}
+                      title={`Delete ${u.role === "merchant" ? "Merchant" : "Customer"}`}
+                    >
+                      <Trash2 size={14} style={{ marginRight: "4px" }} /> Delete {u.role === "merchant" ? "Merchant" : "Customer"}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -264,18 +321,39 @@ export default function AdminDashboard() {
       <section className="panel">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "18px" }}>
           <div>
-            <h2>All Registered Users</h2>
+            <h2>User Management ({filteredUsers.length})</h2>
             <p className="muted" style={{ margin: 0 }}>
-              Manage accounts, KYC statuses, documents, and credit limits.
+              Manage customer & merchant accounts, KYC statuses, documents, credit limits, and deletions.
             </p>
           </div>
-          <div>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+            <div className="tab-filters">
+              <button
+                className={`filter-btn ${userRoleFilter === "all" ? "active" : ""}`}
+                onClick={() => setUserRoleFilter("all")}
+              >
+                All Users ({users.length})
+              </button>
+              <button
+                className={`filter-btn ${userRoleFilter === "customer" ? "active" : ""}`}
+                onClick={() => setUserRoleFilter("customer")}
+              >
+                Customers ({users.filter((u) => u.role === "customer").length})
+              </button>
+              <button
+                className={`filter-btn ${userRoleFilter === "merchant" ? "active" : ""}`}
+                onClick={() => setUserRoleFilter("merchant")}
+              >
+                Merchants ({users.filter((u) => u.role === "merchant").length})
+              </button>
+            </div>
             <input
               type="text"
               className="search-input"
               placeholder="Search user by name, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ minWidth: "220px" }}
             />
           </div>
         </div>
@@ -340,12 +418,22 @@ export default function AdminDashboard() {
                       ✕ Reject
                     </button>
                   )}
+
+                  {u.role !== "admin" && (
+                    <button
+                      className="danger small btn-delete"
+                      onClick={() => setDeleteModalUser(u)}
+                      title={`Delete ${u.role === "merchant" ? "Merchant" : "Customer"}`}
+                    >
+                      <Trash2 size={14} style={{ marginRight: "4px" }} /> Delete {u.role === "merchant" ? "Merchant" : "Customer"}
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })
         ) : (
-          <p className="muted">No users found matching search.</p>
+          <p className="muted" style={{ padding: "16px 0" }}>No users found matching current filters.</p>
         )}
       </section>
 
@@ -550,8 +638,8 @@ export default function AdminDashboard() {
             </div>
 
             {/* Modal Footer with Quick KYC Action Buttons */}
-            <div className="modal-footer">
-              <div style={{ display: "flex", gap: "10px" }}>
+            <div className="modal-footer" style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                 <button
                   className="primary btn-approve"
                   onClick={() => updateKyc(selectedUser._id, "approved")}
@@ -566,6 +654,15 @@ export default function AdminDashboard() {
                 >
                   ✕ Reject KYC
                 </button>
+                {selectedUser.role !== "admin" && (
+                  <button
+                    className="danger btn-delete"
+                    onClick={() => setDeleteModalUser(selectedUser)}
+                    title="Delete user account"
+                  >
+                    <Trash2 size={14} style={{ marginRight: "4px" }} /> Delete Account
+                  </button>
+                )}
               </div>
               <button className="secondary" onClick={() => setSelectedUser(null)}>
                 Close
@@ -623,6 +720,95 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* DELETE USER CONFIRMATION MODAL */}
+      {/* ========================================================================= */}
+      {deleteModalUser && (
+        <div className="modal-overlay" onClick={() => !deleting && setDeleteModalUser(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "480px" }}>
+            <div className="modal-header" style={{ background: "#fef2f2", borderBottom: "1px solid #fecaca" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ background: "#fee2e2", padding: "6px", borderRadius: "8px", display: "flex", color: "#dc2626" }}>
+                  <AlertTriangle size={18} />
+                </div>
+                <h3 style={{ color: "#991b1b", margin: 0 }}>
+                  Delete {deleteModalUser.role === "merchant" ? "Merchant" : "Customer"} Account
+                </h3>
+              </div>
+              <button className="close-btn" disabled={deleting} onClick={() => setDeleteModalUser(null)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: "20px" }}>
+              <div className="delete-warning-box" style={{ background: "#fff5f5", border: "1px solid #fecaca", borderRadius: "8px", padding: "12px 14px", marginBottom: "16px" }}>
+                <p style={{ fontWeight: 700, margin: "0 0 6px", color: "#991b1b", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <AlertTriangle size={16} /> Irreversible Permanent Deletion
+                </p>
+                <p style={{ margin: 0, fontSize: "13px", color: "#7f1d1d", lineHeight: 1.5 }}>
+                  Deleting this account will permanently erase the user profile, uploaded KYC documents, transaction records, repayments, settlements, and notifications.
+                </p>
+              </div>
+
+              <div className="user-overview-box" style={{ margin: 0 }}>
+                <div>
+                  <strong>Name:</strong> {deleteModalUser.name}
+                </div>
+                <div>
+                  <strong>Email:</strong> {deleteModalUser.email}
+                </div>
+                <div>
+                  <strong>Role:</strong>{" "}
+                  <span className={`badge badge-${deleteModalUser.role}`}>
+                    {deleteModalUser.role.toUpperCase()}
+                  </span>
+                </div>
+                <div>
+                  <strong>KYC Status:</strong>{" "}
+                  <span className={`badge badge-${deleteModalUser.kycStatus || "pending"}`}>
+                    {(deleteModalUser.kycStatus || "pending").toUpperCase()}
+                  </span>
+                </div>
+                {deleteModalUser.phone && (
+                  <div>
+                    <strong>Phone:</strong> {deleteModalUser.phone}
+                  </div>
+                )}
+                {deleteModalUser.role === "customer" && (
+                  <div>
+                    <strong>Credit Limit:</strong> ₹{Number(deleteModalUser.creditLimit || 0).toLocaleString()}
+                  </div>
+                )}
+                <div>
+                  <strong>KYC Documents:</strong> {deleteModalUser.kycDocuments?.length || 0} document(s)
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ background: "#f8fafc", borderTop: "1px solid #e2e8f0" }}>
+              <button
+                type="button"
+                className="danger btn-reject"
+                onClick={handleDeleteUser}
+                disabled={deleting}
+                style={{ display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                <Trash2 size={15} />
+                {deleting ? "Deleting Account..." : `Confirm & Delete ${deleteModalUser.role === "merchant" ? "Merchant" : "Customer"}`}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                disabled={deleting}
+                onClick={() => setDeleteModalUser(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -636,3 +822,4 @@ function Card({ title, value, sub }) {
     </div>
   );
 }
+
